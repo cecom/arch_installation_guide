@@ -53,7 +53,7 @@ Here we will follow the Arch wiki:
 - **main** = allocate all remaining space (or as otherwise fit for your specific case) noting that BTRFS doesn't require pre-defined partition sizes, but rather allocates dynamically through subvolumes which act in a similar fashion to partitions but don't require the physical division of the target disk.
     
 9. format your main partition:  
-- setup encryption: `cryptsetup luksformat /dev/nvme0n1p2`  
+- setup encryption: `cryptsetup luksFormat /dev/nvme0n1p2`  
 - open your encrypted partition: `cryptsetup luksOpen /dev/nvme0n1p2 main`
 - format your partition: `mkfs.btrfs /dev/mapper/main`  
 - mount your main partition for installation: `mount /dev/mapper/main /mnt`  
@@ -64,15 +64,17 @@ Here we will follow the Arch wiki:
   > !NOTE: you are welcome to create your own subvolume names, but make sure you know what you are doing, because these subvolumes will also be referenced later when taking snapshots with timeshift.  
 - go back to the original (root) directory with `cd`
 - unmount our mnt partition: `umount /mnt`
-- create our boot and home mounting points `mkdir /mnt/{boot,home}`
 - mount our subvolumes: `mount -o noatime,ssd,compress=zstd,space_cache=v2,discard=async,subvol=@ /dev/mapper/main /mnt`
+- create our boot and home mounting points `mkdir /mnt/{boot,home}`
 - mount our subvolumes: `mount -o noatime,ssd,compress=zstd,space_cache=v2,discard=async,subvol=@home /dev/mapper/main /mnt/home`
 10. format your efi partition:
 - efi: `mkfs.fat -F32 /dev/nvme0n1p1`
-- mount our efi partition with `mount /dev/nvme0np1 /mnt/boot`
-11. install base packages: `pacstrap /mnt base`
-12. generate the file system table: `genfstab -U -p /mnt >> /mnt/etc/fstab` (you can check this with `cat /mnt/etc/fstab`)
-13. change root into the new system: `arch-chroot /mnt`
+- mount our efi partition with `mount /dev/nvme0n1p1 /mnt/boot`
+11. update mirrorlist and choice closest: `reflector -c Thailand -a 12 --sort rate --save /etc/pacman.d/mirrorlist`
+12. update keyring: `pacman -Sy archlinux-keyring`
+13. install base packages: `pacstrap /mnt base linux linux-headers linux-firmware`
+14. generate the file system table: `genfstab -U -p /mnt >> /mnt/etc/fstab` (you can check this with `cat /mnt/etc/fstab`)
+15. change root into the new system: `arch-chroot /mnt`
 
 You are now working from within in your new arch system - i.e. not from the ISO - and you will now see that your prompt start with `#`. Great work so far!
 
@@ -83,14 +85,16 @@ We are now working within our Arch system on our device, but it's important to n
 1. set your local time and locale on your system: 
 - `ln -sf /usr/share/zoneinfo/Asia/Bangkok /etc/localtime` (this is in your system, not on the iso)
 - `hwclock --systohc`
+- install an editor: `pacman -S vim`
 - locale `nvim /etc/locale.gen` uncomment your locale, write and exit and then run `locale-gen`
 - `echo "LANG=en_US.UTF-8" >> /etc/locale.conf` for locale
-- `echo "KEYMAP=en..." >> /etc/vconsole.conf` for keyboard
+- `echo "KEYMAP=en..." >> /etc/vconsole.conf` for keyboard (not needed if us keyboard layout)
 2. change the hostname `echo "x1" >> /etc/hostname` (feel free to customise to your case, the x1 in my case is for the Lenovo x1 Carbon I am installing Arch on).
 3. set your root password: `passwd`
 4. set up a new user (replace `rad` with your preferred username):
 - create `useradd -m -g users -G wheel rad`; 
 - give your user a password with `passwd rad` (you will be prompted to enter a password); and,
+- install sudo and reflector: `pacman -S sudo reflector rsync`
 - add your user to the sudoers group: `echo "rad ALL=(ALL) ALL" >> /etc/sudoers.d/rad`.
 5. set mirrorlist `sudo reflector -c Thailand -a 12 --sort rate --save /etc/pacman.d/mirrorlist` (once again you can substitute Thailand with the location relevant to you)  
 
@@ -100,12 +104,12 @@ Next, we will install all of the packages we need for our system. Refer to the b
 
 6. install the main packages that our system will use:
 ```bash
-pacman -Syu base-devel linux linux-headers linux-firmware btrfs-progs grub efibootmgr mtools networkmanager network-manager-applet openssh sudo vim git iptables-nft ipset firewalld reflector acpid grub-btrfs
+pacman -Syu base-devel linux linux-headers linux-firmware btrfs-progs grub efibootmgr mtools networkmanager network-manager-applet openssh vim git iptables-nft ipset firewalld acpid grub-btrfs
 ```
 
 7. install the following based on the manufacturer of your CPU:
   - **intel:** `pacman -S intel-ucode`
-  - **amd**: `pacman -S amd-code`
+  - **amd**: `pacman -S amd-ucode`
 
 8. install your window manager of choice:
 ```bash
@@ -139,7 +143,6 @@ pacman -S man-db man-pages texinfo bluez bluez-utils pipewire alsa-utils pipewir
 - reflector `systemctl enable reflector.timer`
 - `systemctl enable fstrim.timer`
 - `systemctl enable acpid`
-- `systemctl enable btrfsd`
 
 Now for the moment of truth. Make sure you have followed these steps above carefully, then reboot your system with the `reboot` command.
 
